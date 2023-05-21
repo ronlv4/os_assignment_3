@@ -11,3 +11,5 @@
 #define NBUF         (MAXOPBLOCKS*3)  // size of disk block cache
 #define FSSIZE       2000  // size of file system in blocks
 #define MAXPATH      128   // maximum file path name
+#define MAX_PSYC_PAGES 16 // maximum number of pages in the physical memory
+#define MAX_TOTAL_PAGES 32 // maximum number of pages for process
