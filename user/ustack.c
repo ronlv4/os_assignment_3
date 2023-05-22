@@ -1,4 +1,6 @@
 #include "ustack.h"
+#include "kernel/types.h"
+#include "user/user.h"
 #include "kernel/riscv.h"
 
 // Define the stack data structure
@@ -8,24 +10,42 @@ typedef struct {
     void* prev_top;     // Previous top of the stack (for rollback)
 } ustack_t;
 
-// Global ustack instance
-ustack_t ustack;
+struct header
+{
+    uint len;
+    uint dealloc_page;
+    struct header* prev;
+};
 
-void* ustack_malloc(uint32_t len) {
+
+// Global ustack instance
+static ustack_t ustack;
+static struct header* top;
+
+void* ustack_malloc(uint len) {
+    if (top)
+    {
+        struct header* new_header = (struct header*)ustack.top;
+        new_header->len = len;
+        new_header->dealloc_page = 0;
+        new_header->prev = top;
+        top = new_header;
+    }
+
     // Check if the ustack data structure exists
     if (ustack.base) {
         // Allocate memory for the stack using sbrk()
         ustack.base = sbrk(0);
         ustack.top = ustack.base;
-        ustack.prev_top = NULL;
+        ustack.prev_top = 0;
     }
 
     // Calculate the size required for the new allocation
-    uint32_t aligned_len = (len + sizeof(uint32_t) - 1) & ~(sizeof(uint32_t) - 1);
+    uint aligned_len = (len + sizeof(uint) - 1) & ~(sizeof(uint) - 1);
 
     // Check if the requested size exceeds the maximum allowed size
-    if (aligned_len > 512) {
-        return -1;
+    if (aligned_len > MAX_ALLOC) {
+        return (void*)-1;
     }
 
     // Check if there is enough space on the stack to accommodate the new allocation
@@ -33,7 +53,7 @@ void* ustack_malloc(uint32_t len) {
         // Request another page from the kernel using sbrk()
         void* new_page = sbrk(PGSIZE);
         if (new_page == (void*)-1) {
-            return -1;
+            return (void*)-1;
         }
     }
 
@@ -47,19 +67,19 @@ void* ustack_malloc(uint32_t len) {
 
 int ustack_free() {
     // Check if the stack is empty
-    if (ustack.prev_top == NULL) {
+    if (ustack.prev_top == 0) {
         return -1;
     }
 
     // Calculate the length of the last allocated buffer
-    uint32_t len = (uint32_t)(ustack.top - ustack.prev_top);
+    uint len = (uint)(ustack.top - ustack.prev_top);
 
     // Roll back the stack
     ustack.top = ustack.prev_top;
-    ustack.prev_top = NULL;
+    ustack.prev_top = 0;
 
     // Check if rollback crosses a page boundary
-    if ((uint32_t)ustack.top < (uint32_t)ustack.base) {
+    if (ustack.top < ustack.base) {
         // Release the pages allocated by sbrk()
         sbrk(-PGSIZE);
     }
