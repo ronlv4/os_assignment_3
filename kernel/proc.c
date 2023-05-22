@@ -237,28 +237,34 @@ int add_page(struct proc* p, void *addr, int is_user_page, uint size) {
     return -1;
   }
 
-  p->pages[p->num_pages] = &new_page;
+  p->pages[p->num_pages] = new_page;
   p->num_pages++;
   return 0;
 }
 
 int swap_page_to_disk(struct proc* p)
 {
-  // struct page* pg;
-  // for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
-  // {
-  //   if (pg->in_memory == 1)
-  //   {
-  //     if (writeToSwapFile(p, (char*)pg->va, pg->file_offset * PGSIZE, PGSIZE) == -1)
-  //     {
-  //       return -1;
-  //     }
-  //     pg->in_memory = 0;
-  //     pg->offset = pg->offset + 1;
-  //     return 0;
-  //   }
-  // }
+  struct page* pg;
 
+  if (!p->swapFile && createSwapFile(p) == -1)
+  {
+    return -1;
+  }
+
+  for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
+  {
+    if (pg->in_memory == 1)
+    {      
+      if (writeToSwapFile(p, (char*)pg->va, p->file_offset, pg->size) == -1)
+      {
+        return -1;
+      }
+      pg->in_memory = 0;
+      p->file_offset += pg->size;
+      return 0;
+    }
+  }
+  return -1;
 }
 
 // a user program that calls exec("/init")

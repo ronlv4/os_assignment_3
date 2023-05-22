@@ -115,7 +115,7 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   struct file *swapFile;
-  struct page *pages[MAX_TOTAL_PAGES];
+  struct page pages[MAX_TOTAL_PAGES];
   uint file_offset;
   uint64 num_pages;
   uint64 mem_pages;
