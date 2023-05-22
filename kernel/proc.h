@@ -79,6 +79,12 @@ struct trapframe {
   /* 280 */ uint64 t6;
 };
 
+struct page
+{
+  int in_memory;
+};
+
+
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // Per-process state
@@ -106,4 +112,6 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   struct file *swapFile;
+  struct page *pages[MAX_TOTAL_PAGES];
+  uint64 mem_pages;
 };
