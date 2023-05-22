@@ -131,6 +131,7 @@ found:
     release(&p->lock);
     return 0;
   }
+  add_page(p, p->trapframe, 0, PGSIZE);
 
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
@@ -169,6 +170,9 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  p->num_pages = 0;
+  p->mem_pages = 0;
+  p->file_offset = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -213,6 +217,48 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
   uvmfree(pagetable, sz);
+}
+
+int add_page(struct proc* p, void *addr, int is_user_page, uint size) {
+  if (p->num_pages == MAX_PSYC_PAGES) {
+    return -1;
+  }
+
+  struct page new_page = 
+  {
+    .va = addr,
+    .in_memory = 1,
+    .is_user_page = is_user_page,
+    .size = size
+  };
+
+  if (p->mem_pages == MAX_PSYC_PAGES && swap_page_to_disk(p) == -1)
+  {
+    return -1;
+  }
+
+  p->pages[p->num_pages] = &new_page;
+  p->num_pages++;
+  return 0;
+}
+
+int swap_page_to_disk(struct proc* p)
+{
+  // struct page* pg;
+  // for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
+  // {
+  //   if (pg->in_memory == 1)
+  //   {
+  //     if (writeToSwapFile(p, (char*)pg->va, pg->file_offset * PGSIZE, PGSIZE) == -1)
+  //     {
+  //       return -1;
+  //     }
+  //     pg->in_memory = 0;
+  //     pg->offset = pg->offset + 1;
+  //     return 0;
+  //   }
+  // }
+
 }
 
 // a user program that calls exec("/init")
