@@ -261,6 +261,8 @@ int swap_page_to_disk(struct proc* p)
       }
       pg->in_memory = 0;
       p->file_offset += pg->size;
+      pte_t* pte = walk(p->pagetable, (uint64)pg->va, 0);
+      *pte = (*pte & ~PTE_V) | PTE_PG;
       return 0;
     }
   }
