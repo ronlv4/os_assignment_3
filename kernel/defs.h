@@ -8,6 +8,7 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct page;
 
 // bio.c
 void            binit(void);
@@ -95,7 +96,7 @@ void            proc_mapstacks(pagetable_t);
 pagetable_t     proc_pagetable(struct proc *);
 void            proc_freepagetable(pagetable_t, uint64);
 int             add_page(struct proc*, void* , int, uint);
-int             swap_page_to_disk(struct proc*);
+int             swap_page_to_disk(struct proc*, struct page*);
 int             kill(int);
 int             killed(struct proc*);
 void            setkilled(struct proc*);

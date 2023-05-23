@@ -232,7 +232,7 @@ int add_page(struct proc* p, void *addr, int is_user_page, uint size) {
     .size = size
   };
 
-  if (p->mem_pages == MAX_PSYC_PAGES && swap_page_to_disk(p) == -1)
+  if (p->mem_pages == MAX_PSYC_PAGES && swap_page_to_disk(p, 0) == -1)
   {
     return -1;
   }
@@ -242,7 +242,7 @@ int add_page(struct proc* p, void *addr, int is_user_page, uint size) {
   return 0;
 }
 
-int swap_page_to_disk(struct proc* p)
+int swap_page_to_disk(struct proc* p, struct page* exclude)
 {
   struct page* pg;
 
@@ -253,6 +253,10 @@ int swap_page_to_disk(struct proc* p)
 
   for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
   {
+    if (pg == exclude)
+    {
+      continue;
+    }
     if (pg->in_memory == 1)
     {      
       if (writeToSwapFile(p, (char*)pg->va, p->file_offset, pg->size) == -1)
