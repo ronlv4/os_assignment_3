@@ -82,8 +82,6 @@ struct trapframe {
 struct page
 {
   void *va;
-  int in_memory;
-  int is_user_page;
   uint size;
 };
 
@@ -115,8 +113,8 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   struct file *swapFile;
-  struct page pages[MAX_TOTAL_PAGES];
+  struct page mem_pages[MAX_PSYC_PAGES];
+  struct page swap_pages[MAX_TOTAL_PAGES - MAX_PSYC_PAGES];
   uint file_offset;
   uint64 num_pages;
-  uint64 mem_pages;
 };

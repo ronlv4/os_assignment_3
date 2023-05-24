@@ -244,7 +244,11 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
-    add_page(myproc(), mem, 1, PGSIZE);
+    if (add_page(myproc(), mem, 1, PGSIZE) < 0) {
+      kfree(mem);
+      uvmdealloc(pagetable, a, oldsz);
+      return 0;
+    }
   }
   return newsz;
 }

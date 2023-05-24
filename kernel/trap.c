@@ -65,7 +65,32 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } else if((which_dev = devintr()) != 0){
+  }
+  else if(r_scause() == 12 || r_scause() == 15)
+  {
+    // page fault
+    void* addr = (void*)r_stval();
+    pte_t* pte = walk(p->pagetable, addr, 0);
+    if (*pte & PTE_PG)
+    {
+      // page is swapped out
+      if (swapin(p, addr) == 0)
+      {
+        // swap in failed
+        printf("usertrap(): swapin failed\n");
+        setkilled(p);
+      }
+    }
+    else
+    {
+      // page is not swapped out
+      printf("usertrap(): page fault addr=%p pid=%d\n", addr, p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      setkilled(p);
+    }
+  }
+    // ok
+  else if((which_dev = devintr()) != 0){
     // ok
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
