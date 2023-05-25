@@ -69,12 +69,12 @@ usertrap(void)
   else if(r_scause() == 12 || r_scause() == 15)
   {
     // page fault
-    void* addr = (void*)r_stval();
+    uint64 addr = r_stval();
     pte_t* pte = walk(p->pagetable, addr, 0);
     if (*pte & PTE_PG)
     {
       // page is swapped out
-      if (swapin(p, addr) == 0)
+      if (swapin(p, addr) == -1)
       {
         // swap in failed
         printf("usertrap(): swapin failed\n");

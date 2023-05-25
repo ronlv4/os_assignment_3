@@ -131,7 +131,6 @@ found:
     release(&p->lock);
     return 0;
   }
-  add_page(p, p->trapframe, 0, PGSIZE);
 
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
@@ -170,9 +169,8 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
-  p->num_pages = 0;
-  p->mem_pages = 0;
-  p->file_offset = 0;
+  p->num_mem_pages= 0;
+  p->num_swap_pages = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -219,30 +217,46 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
   uvmfree(pagetable, sz);
 }
 
-int add_page(struct proc* p, void *addr, int is_user_page, uint size) {
-  if (p->num_pages == MAX_PSYC_PAGES) {
+// page was allocated and mapped in the pagetable
+// add it to the process's paging metadata
+// if the process has too many pages, swap one out
+// return 0 on success, -1 on failure
+int add_page(struct proc* p, uint64 addr, int is_user_page, uint size)
+{
+  struct page* pg;
+
+  if (p->num_mem_pages + p->num_swap_pages == MAX_TOTAL_PAGES) {
     return -1;
   }
 
-  struct page new_page = 
-  {
-    .va = addr,
-    .in_memory = 1,
-    .is_user_page = is_user_page,
-    .size = size
-  };
-
-  if (p->mem_pages == MAX_PSYC_PAGES && swap_page_to_disk(p, 0) == -1)
+  if (p->num_mem_pages == MAX_PSYC_PAGES && swapout(p, 0) == -1)
   {
     return -1;
   }
 
-  p->pages[p->num_pages] = new_page;
-  p->num_pages++;
-  return 0;
+  for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
+  {
+    if (!pg->is_used)
+    {
+      pg->is_used = 1;
+      pg->va = addr;
+      pg->in_memory = 1;
+      pg->size = size;
+      if (!pg->offset)
+      {
+        pg->offset = p->file_offset;
+        p->file_offset += size;
+      }
+      p->num_mem_pages++;
+      return 0;
+    }
+  }
+
+  return -1;
 }
 
-int swap_page_to_disk(struct proc* p, struct page* exclude)
+
+int swapout(struct proc* p, struct page* exclude)
 {
   struct page* pg;
 
@@ -253,20 +267,81 @@ int swap_page_to_disk(struct proc* p, struct page* exclude)
 
   for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
   {
-    if (pg == exclude)
+    if (pg == exclude || !pg->is_used || !pg->in_memory)
     {
       continue;
     }
-    if (pg->in_memory == 1)
-    {      
-      if (writeToSwapFile(p, (char*)pg->va, p->file_offset, pg->size) == -1)
+
+    if (writeToSwapFile(p, (char*)pg->va, pg->offset, pg->size) == -1)
+    {
+      return -1;
+    }
+
+    pg->in_memory = 0;
+    pg->is_used = 1;
+    pte_t* pte = walk(p->pagetable, pg->va, 0);
+    if (!pte)
+    {
+      return -1;
+    }
+    *pte = (*pte & ~PTE_V) | PTE_PG;
+    kfree(pte);
+    return 0;
+  }
+
+  return -1;
+}
+
+int swapin(struct proc* p, uint64 addr)
+{
+  if (!p->swapFile)
+  {
+    return -1;
+  }
+
+  if (p->num_mem_pages == MAX_PSYC_PAGES && swapout(p, 0) == -1)
+  {
+    return -1;
+  }
+
+  struct page* pg;
+  for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
+  {
+    if (pg->va == addr)
+    {
+      if (readFromSwapFile(p, (char*)pg->va, pg->offset, pg->size) == -1)
       {
         return -1;
       }
-      pg->in_memory = 0;
-      p->file_offset += pg->size;
-      pte_t* pte = walk(p->pagetable, (uint64)pg->va, 0);
-      *pte = (*pte & ~PTE_V) | PTE_PG;
+      pte_t* pte = walk(p->pagetable, pg->va, 0);
+      *pte = (*pte & ~PTE_PG) | PTE_V;
+      pg->in_memory = 1;
+      p->num_mem_pages++;
+      return 0;
+    }
+  }
+
+  return -1;
+}
+
+int remove_page(struct proc* p, uint64 addr)
+{
+  struct page* pg;
+  for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
+  {
+    if (pg->va == addr)
+    {
+      pg->va = 0; 
+      pg->is_used = 0;
+      pg->size = 0;
+      if (pg->in_memory)
+      {
+        p->num_mem_pages--;
+      }
+      else
+      {
+        p->num_swap_pages--;
+      }
       return 0;
     }
   }
