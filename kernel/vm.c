@@ -244,11 +244,13 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
-    if (add_page(myproc(), a, 1, PGSIZE) < 0) {
-      kfree(mem);
-      uvmdealloc(pagetable, a, oldsz);
-      return 0;
-    }
+    #if SWAP_ALGO == DISABLED
+      if (add_page(myproc(), a, 1, PGSIZE) < 0) {
+        kfree(mem);
+        uvmdealloc(pagetable, a, oldsz);
+        return 0;
+      }
+    #endif
   }
   return newsz;
 }
