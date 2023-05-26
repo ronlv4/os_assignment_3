@@ -236,7 +236,7 @@ int add_page(struct proc* p, uint64 addr, int is_user_page, uint size)
 
   for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
   {
-    if (!pg->is_used)
+    if (pg->is_used == 0)
     {
       pg->is_used = 1;
       pg->va = addr;
@@ -272,20 +272,22 @@ int swapout(struct proc* p, struct page* exclude)
       continue;
     }
 
-    if (writeToSwapFile(p, (char*)pg->va, pg->offset, pg->size) == -1)
+    pte_t* pte = walk(p->pagetable, pg->va, 0);
+    if (!pte)
+    {
+      return -1;
+    }
+
+    if (writeToSwapFile(p, (char*)pte, pg->offset, pg->size) == -1)
     {
       return -1;
     }
 
     pg->in_memory = 0;
     pg->is_used = 1;
-    pte_t* pte = walk(p->pagetable, pg->va, 0);
-    if (!pte)
-    {
-      return -1;
-    }
-    *pte = (*pte & ~PTE_V) | PTE_PG;
-    kfree(pte);
+    *pte = (*pte & ~PTE_V) | PTE_PG; // mark as not valid and swapped out
+    uint64 pa = PTE2PA(*pte);
+    kfree((void*)pa);
     return 0;
   }
 
@@ -309,11 +311,17 @@ int swapin(struct proc* p, uint64 addr)
   {
     if (pg->va == addr)
     {
-      if (readFromSwapFile(p, (char*)pg->va, pg->offset, pg->size) == -1)
+      pte_t* pte = walk(p->pagetable, pg->va, 0);
+      if (!pte)
       {
         return -1;
       }
-      pte_t* pte = walk(p->pagetable, pg->va, 0);
+
+      if (readFromSwapFile(p, (char*)pte, pg->offset, pg->size) == -1)
+      {
+        return -1;
+      }
+
       *pte = (*pte & ~PTE_PG) | PTE_V;
       pg->in_memory = 1;
       p->num_mem_pages++;

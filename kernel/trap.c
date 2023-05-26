@@ -66,28 +66,10 @@ usertrap(void)
 
     syscall();
   }
-  else if(r_scause() == 12 || r_scause() == 15)
+  else if(r_scause() == 13 || r_scause() == 15)
   {
     // page fault
-    uint64 addr = r_stval();
-    pte_t* pte = walk(p->pagetable, addr, 0);
-    if (*pte & PTE_PG)
-    {
-      // page is swapped out
-      if (swapin(p, addr) == -1)
-      {
-        // swap in failed
-        printf("usertrap(): swapin failed\n");
-        setkilled(p);
-      }
-    }
-    else
-    {
-      // page is not swapped out
-      printf("usertrap(): page fault addr=%p pid=%d\n", addr, p->pid);
-      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-      setkilled(p);
-    }
+    handle_page_fault(p);
   }
     // ok
   else if((which_dev = devintr()) != 0){
@@ -241,6 +223,29 @@ devintr()
     return 2;
   } else {
     return 0;
+  }
+}
+
+void handle_page_fault(struct proc* p)
+{
+  uint64 addr = r_stval();
+  pte_t* pte = walk(p->pagetable, addr, 0);
+  if (*pte & PTE_PG)
+  {
+    // page is swapped out
+    if (swapin(p, addr) == -1)
+    {
+      // swap in failed
+      printf("usertrap(): swapin failed\n");
+      setkilled(p);
+    }
+  }
+  else
+  {
+    // page is not swapped out
+    printf("usertrap(): page fault addr=%p pid=%d\n", addr, p->pid);
+    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    setkilled(p);
   }
 }
 
