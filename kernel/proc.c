@@ -285,6 +285,8 @@ int swapout(struct proc* p, struct page* exclude)
 
     pg->in_memory = 0;
     pg->is_used = 1;
+    p->num_mem_pages--;
+    p->num_swap_pages++;
     *pte = (*pte & ~PTE_V) | PTE_PG; // mark as not valid and swapped out
     uint64 pa = PTE2PA(*pte);
     kfree((void*)pa);
@@ -325,6 +327,7 @@ int swapin(struct proc* p, uint64 addr)
       *pte = (*pte & ~PTE_PG) | PTE_V;
       pg->in_memory = 1;
       p->num_mem_pages++;
+      p->num_swap_pages--;
       return 0;
     }
   }
