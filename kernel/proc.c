@@ -224,6 +224,10 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 int add_page(struct proc* p, uint64 addr, int is_user_page, uint size)
 {
   struct page* pg;
+  if (p == initproc || p->pid <= 2)
+  {
+    return 0;
+  }
 
   if (p->num_mem_pages + p->num_swap_pages == MAX_TOTAL_PAGES) {
     return -1;
@@ -460,6 +464,21 @@ fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
+
+  if (p->swapFile)
+  {
+    createSwapFile(np);
+    int buffer_size = 1024;
+    uint offset = 0;
+    char buffer[buffer_size];
+
+    while (readFromSwapFile(p, buffer, offset, buffer_size) > 0)
+    {
+      writeToSwapFile(np, buffer, offset, buffer_size);
+      offset += buffer_size;
+    }
+  }
+
 
   release(&np->lock);
 

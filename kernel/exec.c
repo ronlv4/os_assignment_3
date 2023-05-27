@@ -24,6 +24,8 @@ exec(char *path, char **argv)
 {
   char *s, *last;
   int i, off;
+  int old_num_mem_pages = 0, old_num_swap_pages = 0;
+  uint old_file_offset = 0;
   uint64 argc, sz = 0, sp, ustack[MAXARG], stackbase;
   struct elfhdr elf;
   struct inode *ip;
@@ -48,6 +50,20 @@ exec(char *path, char **argv)
 
   if((pagetable = proc_pagetable(p)) == 0)
     goto bad;
+
+  // save current process pages
+  struct page backup_pages[MAX_TOTAL_PAGES];
+  memmove(backup_pages, p->pages, sizeof(p->pages));
+  old_num_mem_pages = p->num_mem_pages;
+  old_num_swap_pages = p->num_swap_pages;
+  old_file_offset = p->file_offset;
+
+  // zero current process pages
+  memset(p->pages, 0, sizeof(p->pages));
+  p->num_mem_pages = 0;
+  p->num_swap_pages = 0;
+  p->file_offset = 0;
+
 
   // Load program into memory.
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
@@ -127,11 +143,6 @@ exec(char *path, char **argv)
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
-  p->swapFile = 0;
-  p->num_mem_pages= 0;
-  p->num_swap_pages = 0;
-  p->file_offset = 0;
-  memset(&p->pages, 0, sizeof(p->pages));
 
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
@@ -142,6 +153,11 @@ exec(char *path, char **argv)
     iunlockput(ip);
     end_op();
   }
+  // restore old pages
+  memmove(p->pages, backup_pages, sizeof(p->pages));
+  p->num_mem_pages = old_num_mem_pages;
+  p->num_swap_pages = old_num_swap_pages;
+  p->file_offset = old_file_offset;
   return -1;
 }
 
