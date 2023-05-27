@@ -267,7 +267,7 @@ int swapout(struct proc* p, struct page* exclude)
 
   for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
   {
-    if (pg == exclude || !pg->is_used || !pg->in_memory)
+    if (pg == exclude || (pg->is_used == 0) || (pg->in_memory == 0))
     {
       continue;
     }
@@ -313,6 +313,11 @@ int swapin(struct proc* p, uint64 addr)
   {
     if (pg->va == addr)
     {
+      if (pg->in_memory == 1 || pg->is_used == 0)
+      {
+        panic("panic: swapin");
+      }
+
       pte_t* pte = walk(p->pagetable, pg->va, 0);
       if (!pte)
       {
