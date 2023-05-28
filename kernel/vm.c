@@ -244,13 +244,30 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
       uvmdealloc(pagetable, a, oldsz);
       return 0;
     }
-    #if SWAP_ALGO == DISABLED
+    #if SWAP_ALGO == SCFIFO
       if (add_page(myproc(), a, 1, PGSIZE) < 0)
       {
         kfree(mem);
         uvmdealloc(pagetable, a, oldsz);
         return 0;
       }
+    
+    #elif SWAP_ALGO == NFUA
+      if (add_page(myproc(), a, 1, PGSIZE) < 0)
+      {
+        kfree(mem);
+        uvmdealloc(pagetable, a, oldsz);
+        return 0;
+      }
+
+    #elif SWAP_ALGO == LAPA
+      if (add_page(myproc(), a, 1, PGSIZE) < 0)
+      {
+        kfree(mem);
+        uvmdealloc(pagetable, a, oldsz);
+        return 0;
+      }
+
     #endif
   }
   return newsz;

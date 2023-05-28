@@ -86,6 +86,7 @@ struct page
   int in_memory;
   uint size;
   uint offset;
+  uint acceced_counter;
 };
 
 

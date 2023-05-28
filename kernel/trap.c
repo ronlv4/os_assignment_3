@@ -243,8 +243,8 @@ void handle_page_fault(struct proc* p)
   else
   {
     // page is not swapped out
-    printf("usertrap(): page fault addr=%p pid=%d\n", addr, p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    printf("usertrap(): page fault pid=%d\n", addr, p->pid);
+    printf("            sepc=%p stval=%p\n", r_sepc(), addr);
     setkilled(p);
   }
 }

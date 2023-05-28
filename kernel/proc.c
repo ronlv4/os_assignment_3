@@ -223,6 +223,9 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 // return 0 on success, -1 on failure
 int add_page(struct proc* p, uint64 addr, int is_user_page, uint size)
 {
+  #if SWAP_ALGO == NONE
+    return 0;
+  #endif
   struct page* pg;
   if (p == initproc || p->pid <= 2)
   {
@@ -246,6 +249,11 @@ int add_page(struct proc* p, uint64 addr, int is_user_page, uint size)
       pg->va = addr;
       pg->in_memory = 1;
       pg->size = size;
+      #if SWAP_ALGO == LAPA
+        pg->acceced_counter = 0xFFFFFFFF;
+      #else
+        pg->acceced_counter = 0;
+      #endif
       if (!pg->offset)
       {
         pg->offset = p->file_offset;
@@ -264,40 +272,62 @@ int swapout(struct proc* p, struct page* exclude)
 {
   struct page* pg;
 
+
   if (!p->swapFile && createSwapFile(p) == -1)
   {
     return -1;
   }
 
+  struct page* swap = 0;
+  #if SWAP_ALGO == LAPA || SWAP_ALGO == NFUA
+  uint min_counter = 0xFFFFFFFF;
   for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
   {
-    if (pg == exclude || (pg->is_used == 0) || (pg->in_memory == 0))
+    if (pg == exclude || !pg->is_used || !pg->in_memory)
     {
       continue;
     }
 
-    pte_t* pte = walk(p->pagetable, pg->va, 0);
+    if (pg->acceced_counter < min_counter)
+    {
+      min_counter = pg->acceced_counter;
+      swap = pg;
+    }
+  }
+
+  #elif SWAP_ALGO == SCFIFO
+  struct page* first = 0;
+  for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
+  {
+    if (pg == exclude || !pg->is_used || !pg->in_memory)
+    {
+      continue;
+    }
+
+    swap = pg;
+    break;
+  }
+  #endif
+
+    pte_t* pte = walk(p->pagetable, swap->va, 0);
     if (!pte)
     {
       return -1;
     }
 
-    if (writeToSwapFile(p, (char*)pte, pg->offset, pg->size) == -1)
+    if (writeToSwapFile(p, (char*)pte, swap->offset, swap->size) == -1)
     {
       return -1;
     }
 
-    pg->in_memory = 0;
-    pg->is_used = 1;
+    swap->in_memory = 0;
+    swap->is_used = 1;
     p->num_mem_pages--;
     p->num_swap_pages++;
     *pte = (*pte & ~PTE_V) | PTE_PG; // mark as not valid and swapped out
     uint64 pa = PTE2PA(*pte);
     kfree((void*)pa);
     return 0;
-  }
-
-  return -1;
 }
 
 int swapin(struct proc* p, uint64 addr)
@@ -335,6 +365,7 @@ int swapin(struct proc* p, uint64 addr)
 
       *pte = (*pte & ~PTE_PG) | PTE_V;
       pg->in_memory = 1;
+      pg->acceced_counter = 0;
       p->num_mem_pages++;
       p->num_swap_pages--;
       return 0;
@@ -477,8 +508,12 @@ fork(void)
       writeToSwapFile(np, buffer, offset, buffer_size);
       offset += buffer_size;
     }
+    np->file_offset = offset;
+    np->num_swap_pages = p->num_swap_pages;
   }
 
+  np->num_mem_pages = p->num_mem_pages;
+  memmove(np->pages, p->pages, sizeof(struct page) * MAX_TOTAL_PAGES);
 
   release(&np->lock);
 

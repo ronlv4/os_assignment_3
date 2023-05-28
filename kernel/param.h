@@ -13,3 +13,7 @@
 #define MAXPATH      128   // maximum file path name
 #define MAX_PSYC_PAGES 16 // maximum number of pages in the physical memory
 #define MAX_TOTAL_PAGES 32 // maximum number of pages for process
+#define SCFIFO 1
+#define NFUA 2
+#define LAPA 3
+#define NONE 4

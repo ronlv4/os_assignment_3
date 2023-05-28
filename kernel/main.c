@@ -16,6 +16,15 @@ main()
     printf("\n");
     printf("xv6 kernel is booting\n");
     printf("\n");
+    #if SWAP_ALGO == SCFIFO
+      printf("Using SCFIFO swap algorithm\n");
+    #elif SWAP_ALGO == LAPA
+      printf("Using LAPA swap algorithm\n");
+    #elif SWAP_ALGO == NONE
+      printf("Using no swap algorithm\n");
+    #elif SWAP_ALGO == NFUA
+      printf("Using NFUA swap algorithm\n");
+    #endif
     kinit();         // physical page allocator
     kvminit();       // create kernel page table
     kvminithart();   // turn on paging
