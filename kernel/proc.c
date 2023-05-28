@@ -296,7 +296,6 @@ int swapout(struct proc* p, struct page* exclude)
   }
 
   #elif SWAP_ALGO == SCFIFO
-  struct page* first = 0;
   for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
   {
     if (pg == exclude || !pg->is_used || !pg->in_memory)
