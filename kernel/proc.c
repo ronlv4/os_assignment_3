@@ -164,6 +164,10 @@ freeproc(struct proc *p)
   p->trapframe = 0;
   if (p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+  if (p->swapFile)
+  {
+    removeSwapFile(p);
+  }
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
