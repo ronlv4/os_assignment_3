@@ -172,6 +172,9 @@ clockintr()
 {
   acquire(&tickslock);
   ticks++;
+  #if SWAP_ALGO == NFUA || SWAP_ALGO == LAPA
+    update_page_counters(myproc());
+  #endif
   wakeup(&ticks);
   release(&tickslock);
 }

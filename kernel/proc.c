@@ -283,7 +283,7 @@ int swapout(struct proc *p, struct page *exclude)
   }
 
   struct page *swap = 0;
-#if SWAP_ALGO == LAPA || SWAP_ALGO == NFUA
+#if SWAP_ALGO == NFUA
   uint min_counter = 0xFFFFFFFF;
   for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
   {
@@ -299,6 +299,32 @@ int swapout(struct proc *p, struct page *exclude)
     }
   }
 
+#elif SWAP_ALGO == LAPA
+  uint min_bits_num = 0;
+  int found = 0;
+  for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
+  {
+    if (pg == exclude || !pg->is_used || !pg->in_memory)
+    {
+      continue;
+    }
+
+    if (!found)
+    {
+      swap = pg;
+      min_bits_num = count_one_bits(pg->acceced_counter);
+      found = 1;
+    }
+    else
+    {
+      uint bits_num = count_one_bits(pg->acceced_counter);
+      if (bits_num < min_bits_num)
+      {
+        min_bits_num = bits_num;
+        swap = pg;
+      }
+    }
+  }
 #elif SWAP_ALGO == SCFIFO
   for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
   {
@@ -400,6 +426,38 @@ int remove_page(struct proc *p, uint64 addr)
     }
   }
   return -1;
+}
+
+int update_page_counters(struct proc *p)
+{
+  struct page *pg;
+  for (pg = p->pages; pg < &p->pages[MAX_TOTAL_PAGES]; pg++)
+  {
+    pte_t* pte = walk(p->pagetable, pg->va, 0);
+    if (!pte)
+    {
+      return -1;
+    }
+
+    pg->acceced_counter = pg->acceced_counter >> 1;
+    if (*pte & PTE_A)
+    {
+      pg->acceced_counter = pg->acceced_counter | 0x80000000; //raise msb
+      *pte = *pte & ~PTE_A; //clear access bit
+    }
+  }
+  return 0;
+}
+
+uint count_one_bits(uint n)
+{
+  uint count = 0;
+  while (n)
+  {
+    count += n & 1;
+    n >>= 1;
+  }
+  return count;
 }
 
 // a user program that calls exec("/init")

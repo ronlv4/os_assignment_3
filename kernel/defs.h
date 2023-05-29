@@ -99,6 +99,8 @@ int             add_page(struct proc*, uint64 , int, uint);
 int             swapout(struct proc*, struct page*);
 int             swapin(struct proc*, uint64);
 int             remove_page(struct proc*, uint64);
+int             update_page_counters(struct proc*);
+uint            count_one_bits(uint);
 int             kill(int);
 int             killed(struct proc*);
 void            setkilled(struct proc*);
